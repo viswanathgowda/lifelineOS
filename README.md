@@ -1,0 +1,2 @@
+lifeline os
+An Operating System for individual person where it keeps the complete record of person's life, helps in accessing the data from remote areas, keeping the complete data in secure private place(belongs to individual person, not a cloud service) with dedicated hardware system, giving the suggestions by looking to into past(like health, fitness, finance, etc.).a complete end to end life of person.
