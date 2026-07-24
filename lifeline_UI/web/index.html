@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>lifelineOS</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="brand">
+      <p class="logo">lifelineOS</p>
+      <p class="tag">Your life data — local vault, tunnel only</p>
+    </header>
+
+    <section class="panel">
+      <h1>Connect</h1>
+      <label>API base
+        <input id="apiBase" value="http://localhost:8080" />
+      </label>
+      <label>Bearer / MFA session token
+        <input id="token" type="password" value="lifeline-dev-token-change-me" />
+      </label>
+      <div class="row">
+        <button type="button" id="btnStatus">Ping core</button>
+        <button type="button" id="btnVolumes">Storage volumes</button>
+        <button type="button" id="btnRefreshVault" class="secondary">Refresh vault</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h1>Vault gallery</h1>
+      <p class="hint">Loads every file via the tunnel API and previews images in the browser. Nothing is read from disk by the UI.</p>
+      <div id="vaultEmpty" class="empty">No files loaded yet — click <strong>Refresh vault</strong>.</div>
+      <div id="vaultGrid" class="vault-grid" hidden></div>
+    </section>
+
+    <section class="panel viewer" id="viewerPanel" hidden>
+      <h1>Preview</h1>
+      <p id="viewerMeta" class="hint"></p>
+      <img id="viewerImage" alt="Vault preview" hidden />
+      <iframe id="viewerFrame" title="File preview" hidden></iframe>
+      <div class="row">
+        <button type="button" id="btnDownload" class="secondary">Download</button>
+        <button type="button" id="btnCloseViewer" class="ghost">Close</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h1>Upload to vault</h1>
+      <label>Namespace
+        <select id="namespace">
+          <option>DOCUMENTS</option>
+          <option>HEALTH_EXPORTS</option>
+          <option>BACKUPS</option>
+          <option>FINANCE</option>
+          <option selected>GENERAL</option>
+        </select>
+      </label>
+      <label>Volume id
+        <input id="volumeId" value="primary" />
+      </label>
+      <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.json,.csv,.zip" />
+      <button type="button" id="btnUpload">Upload</button>
+    </section>
+
+    <section class="panel">
+      <h1>MFA / backup</h1>
+      <div class="row">
+        <button type="button" id="btnMfaStatus">MFA status</button>
+        <button type="button" id="btnBackup">Export backup</button>
+      </div>
+      <label>TOTP code (after setup on core)
+        <input id="mfaCode" maxlength="6" placeholder="123456" />
+      </label>
+      <button type="button" id="btnMfaVerify">Verify MFA → session</button>
+    </section>
+
+    <section class="panel">
+      <h1>Log</h1>
+      <pre id="out">Ready.</pre>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

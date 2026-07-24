@@ -134,16 +134,17 @@ lifeline.storage.encryption.enabled=true
 
 ---
 
-## Technology stack (current bootstrap)
+## Technology stack (MVP core)
 
 | Item | Choice |
 |------|--------|
 | Language | **Java 21** |
 | Framework | **Spring Boot 4** (system service host — Web MVC for tunnel APIs) |
 | Build | **Maven** (`mvnw` / `mvnw.cmd`) |
-| Tests | JUnit 5 |
-| Persistence (next) | Local embedded DB + vault on disk |
-| Security (next) | Spring Security, TLS/mTLS |
+| Tests | JUnit 5 + MockMvc |
+| Persistence | **H2** file DB under `~/.lifeline/data/db` + encrypted vault files |
+| Security | Spring Security, Bearer token (MVP), HTTPS/mTLS hooks, local audit log |
+| Encryption | AES-256-GCM at rest for vault payloads |
 
 Artifact: `com.lifeline:lifelineOS` (`0.0.1-SNAPSHOT`).
 
@@ -153,22 +154,23 @@ Artifact: `com.lifeline:lifelineOS` (`0.0.1-SNAPSHOT`).
 
 ```
 lifelineOS/
-├── security/          # Tunnel termination, mTLS, auth filters
-├── tunnel/            # Gateway config, client registry
-├── files/             # File management & vault operations
-├── persistence/       # Local DB (MVP), future volume adapters
-├── config/
-├── common/
+├── security/          # Bearer auth, device identity, audit log
+├── tunnel/            # Gateway status, mTLS cert filter, client registry
+├── mfa/               # TOTP + MFA sessions
+├── files/             # File management APIs (opaque IDs, namespaces, volumeId)
+├── persistence/       # Encrypted vault blobs + crypto
+├── storage/           # Primary + extendable volumes (D: / Linux mounts)
+├── backup/            # Encrypted backup export/import
+├── config/            # lifeline.* properties, CORS
+├── common/            # API errors
 ├── health/
-├── fitness/
 ├── finance/
 ├── insights/
-└── LifelineOsApplication.java   # OS core entry point
+├── HomeController.java
+└── LifelineOsApplication.java
 ```
 
 **Layers:** Security/tunnel → API → Application (use cases) → Domain → Infrastructure (disk, DB, encryption).
-
-Current code: **bootstrap only** (`GET /`, context load test). OS services above are the implementation order on the roadmap.
 
 ---
 
@@ -188,20 +190,114 @@ lifeline_Java/
 
 ## Run (MVP development)
 
-```bash
-cd lifeline_Java
-./mvnw spring-boot:run          # Windows: .\mvnw.cmd spring-boot:run
+### Prerequisites
+
+- **Java 21** JDK on your `PATH` (`java -version` should show 21)
+- Maven Wrapper is included — no separate Maven install required
+
+### Start the OS core
+
+From this directory (`lifeline_Java/`):
+
+**Windows (PowerShell or Command Prompt):**
+
+```powershell
+.\mvnw.cmd spring-boot:run
 ```
+
+**macOS / Linux:**
+
+```bash
+./mvnw spring-boot:run
+```
+
+First run downloads dependencies. When ready, the server listens on **port 8080**.
+
+### Auth (required for data APIs)
+
+Default dev token (change in `application.properties`):
+
+```text
+lifeline-dev-token-change-me
+```
+
+Send on every `/api/**` call except `/api/tunnel/status`:
+
+```powershell
+# Windows PowerShell
+$headers = @{ Authorization = "Bearer lifeline-dev-token-change-me" }
+Invoke-RestMethod http://localhost:8080/api/files -Headers $headers
+```
+
+```bash
+curl -H "Authorization: Bearer lifeline-dev-token-change-me" http://localhost:8080/api/files
+```
+
+### API surface (MVP)
+
+| Method | Path | Auth | Notes |
+|--------|------|------|--------|
+| `GET` | `/` | no | Core status JSON |
+| `GET` | `/api/tunnel/status` | no | Tunnel gateway status |
+| `POST` | `/api/devices/enroll` | yes + client cert | Bind mTLS cert fingerprint to device |
+| `GET` | `/api/devices/me` | yes | Current principal / device flags |
+| `GET`/`POST` | `/api/auth/mfa/*` | yes | TOTP setup, enable, verify → session |
+| `GET` | `/api/files?namespace=` | yes | List vault file metadata (opaque IDs) |
+| `GET` | `/api/files/{id}` | yes | Metadata only — no disk paths |
+| `GET` | `/api/files/{id}/content` | yes | Download decrypted bytes |
+| `POST` | `/api/files` | yes | Multipart upload (`file`, `namespace`, `volumeId`) |
+| `PUT` | `/api/files/{id}` | yes | Move/rename (`namespace`, `displayName`) |
+| `DELETE` | `/api/files/{id}` | yes | Delete metadata + encrypted blob |
+| `GET` | `/api/storage/volumes` | yes | Primary + extendable volume status |
+| `POST` | `/api/storage/volumes/mount` | yes | Mount path as volume id |
+| `POST` | `/api/backup/export` | yes | Encrypted `.lifelinebak` on disk |
+| `POST` | `/api/backup/import` | yes | Restore encrypted archive |
+| `GET`/`POST` | `/api/health` | yes | Health domain records |
+| `GET`/`POST` | `/api/finance` | yes | Finance domain entries |
+| `GET` | `/api/insights/summary` | yes | Cross-domain counts stub |
+
+Namespaces: `DOCUMENTS`, `HEALTH_EXPORTS`, `BACKUPS`, `FINANCE`, `GENERAL`.
+
+Upload example:
+
+```powershell
+curl.exe -H "Authorization: Bearer lifeline-dev-token-change-me" `
+  -F "file=@.\note.txt" -F "namespace=DOCUMENTS" `
+  http://localhost:8080/api/files
+```
+
+### Verify
 
 | Endpoint | Notes |
 |----------|--------|
-| `GET /` | Bootstrap check — `Lifeline OS Running` |
+| `GET /` | Status JSON includes `status: Lifeline OS Running` |
 | Default port | `8080` — **dev only**; production requires HTTPS/tunnel |
 
+```powershell
+# Windows PowerShell
+Invoke-RestMethod http://localhost:8080/
+```
+
 ```bash
+# macOS / Linux
+curl http://localhost:8080/
+```
+
+### Build and test
+
+```powershell
+# Windows
+.\mvnw.cmd test
+.\mvnw.cmd package
+```
+
+```bash
+# macOS / Linux
 ./mvnw test
 ./mvnw package
 ```
+
+The packaged JAR is written to `target/`.
 
 ---
 
@@ -209,9 +305,41 @@ cd lifeline_Java
 
 ```properties
 spring.application.name=lifelineOS
+lifeline.storage.path=${user.home}/.lifeline/data
+lifeline.storage.encryption.enabled=true
+lifeline.storage.encryption-key=<Base64 32-byte AES key>
+lifeline.security.api-token=<change-me>
+lifeline.mfa.enabled=false
+lifeline.tunnel.require-https=false
+lifeline.tunnel.mtls-enabled=false
+lifeline.tunnel.require-device-identity=false
+lifeline.tunnel.allowed-protocols=TLSv1.3
 ```
 
-Planned: storage path, TLS keystores, mTLS trust stores, profiles (`dev` | `device`).
+### Profiles
+
+| Profile | Purpose |
+|---------|---------|
+| `card` | Primary data on **`D:/lifeline/data`**, extendable volume `memory-card` → `D:/lifeline/ext` |
+| `mtls` | HTTPS 8443, TLS 1.3, `client-auth=need` (run `scripts/generate-mtls-certs.ps1` first) |
+| `device` | Linux appliance paths + mTLS + MFA |
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=card"
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=mtls"
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=card,mtls"
+```
+
+Data layout on disk (default):
+
+```text
+~/.lifeline/data/
+  db/          # H2 metadata (file entries, audit, life domains, devices, MFA)
+  vault/       # AES-GCM encrypted blobs (*.enc)
+  backup/      # Encrypted .lifelinebak exports
+```
+
+Card layout: see [STRUCTURE.md](../STRUCTURE.md). UI lives in [lifeline_UI](../lifeline_UI/).
 
 ---
 
@@ -219,25 +347,29 @@ Planned: storage path, TLS keystores, mTLS trust stores, profiles (`dev` | `devi
 
 ### MVP (Java OS core on PC)
 
-- [ ] Tunnel gateway — HTTPS, then mTLS
-- [ ] Authentication & device/user identity (single owner)
-- [ ] Local embedded DB + encrypted vault path
-- [ ] **File management** APIs (list, read, write, delete in vault)
-- [ ] Encryption at rest + threat model doc
-- [ ] Package layout: `security`, `tunnel`, `files`, `persistence`
+- [x] Tunnel gateway + client registry + HTTPS enforcement
+- [x] **mTLS termination** + device enrollment by cert fingerprint
+- [x] **MFA (TOTP)** + session tokens
+- [x] Local embedded DB (H2) + encrypted vault (AES-GCM)
+- [x] File management APIs (opaque IDs + volume id)
+- [x] **Encrypted backup/export**
+- [x] **Extendable storage volumes** (D: card / Linux mount)
+- [x] Local security audit log
+- [ ] TPM / hardware-bound client keys
+- [ ] Richer backup manifest round-trip
 
 ### lifelineOS on hardware
 
 - [ ] Bootable image: minimal Linux + lifeline Java core as system service
-- [ ] Extendable storage (mount, encrypt, expose to `files` layer)
 - [ ] Hardware-bound certificates / secure element
-- [ ] Life domains and cross-domain insights
-- [ ] UI repos with cert pinning, tunnel-only
+- [ ] Richer life domains and cross-domain insights
+- [ ] Mobile/shell UI with cert pinning
 
 ---
 
 ## Related
 
 - [lifelineOS (parent)](../README.md)
+- [STRUCTURE.md](../STRUCTURE.md) — full folder + storage map
+- [lifeline_UI](../lifeline_UI/) — tunnel-only clients
 - Entry: `lifelineOS.LifelineOsApplication`
-- Sample: `lifelineOS.HomeController`

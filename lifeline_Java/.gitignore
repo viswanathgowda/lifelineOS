@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### lifelineOS local secrets / generated certs ###
+certs-dev/
+src/main/resources/certs/*.p12

@@ -1,0 +1,9 @@
+{
+  "name": "lifeline-ui-web",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Tunnel-only web UI for lifelineOS",
+  "scripts": {
+    "start": "npx --yes serve -l 5173 ."
+  }
+}
