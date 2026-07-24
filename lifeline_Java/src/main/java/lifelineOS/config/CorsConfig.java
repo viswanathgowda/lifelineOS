@@ -18,10 +18,12 @@ public class CorsConfig {
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowedOriginPatterns(List.of(
+				"http://172.20.10.5:5173",
 				"http://localhost:*",
 				"http://127.0.0.1:*",
 				"https://localhost:*",
-				"https://127.0.0.1:*"));
+				"https://127.0.0.1:*"
+				 ));
 		config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 		config.setAllowedHeaders(List.of("*"));
 		config.setAllowCredentials(true);
