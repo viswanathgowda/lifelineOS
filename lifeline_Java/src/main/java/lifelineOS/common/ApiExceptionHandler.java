@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -27,4 +28,11 @@ public class ApiExceptionHandler {
 	public ProblemDetail illegalState(IllegalStateException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
 	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail maxUploadSize(MaxUploadSizeExceededException ex) {
+    return ProblemDetail.forStatusAndDetail(
+            HttpStatus.PAYLOAD_TOO_LARGE,
+            "The uploaded file exceeds the maximum allowed size.");
+}
 }
