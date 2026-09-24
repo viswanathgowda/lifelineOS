@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDayLabel } from "@/lib/media";
-import { useAppSelector, useAppDispatch } from "@/lib/store/hooks";
-import { launchVault, enforceCachePolicy } from "@/lib/store/vaultThunks";
+import { useVaultStore } from "@/lib/store";
 import type { VaultFile } from "@/lib/types";
 import { GalleryTile } from "./GalleryTile";
 import { PhotoViewer } from "./PhotoViewer";
@@ -31,17 +30,17 @@ function formatRemaining(expiresAt: number | null): string {
 }
 
 export function GalleryView() {
-  const dispatch = useAppDispatch();
-
-  const files = useAppSelector((state) => state.vault.files);
-  const launching = useAppSelector((state) => state.vault.launching);
-  const launchProgress = useAppSelector((state) => state.vault.launchProgress);
-  const error = useAppSelector((state) => state.vault.error);
-  const lastLaunchedAt = useAppSelector((state) => state.vault.lastLaunchedAt);
-  const cacheExpiresAt = useAppSelector((state) => state.vault.cacheExpiresAt);
-  const hydrated = useAppSelector((state) => state.vault.hydrated);
-  const ttl = useAppSelector((state) => state.vault.settings.cacheTtlMinutes);
-  const apiBase = useAppSelector((state) => state.vault.settings.apiBase);
+  const files = useVaultStore((s) => s.files);
+  const launching = useVaultStore((s) => s.launching);
+  const launchProgress = useVaultStore((s) => s.launchProgress);
+  const error = useVaultStore((s) => s.error);
+  const lastLaunchedAt = useVaultStore((s) => s.lastLaunchedAt);
+  const cacheExpiresAt = useVaultStore((s) => s.cacheExpiresAt);
+  const hydrated = useVaultStore((s) => s.hydrated);
+  const ttl = useVaultStore((s) => s.settings.cacheTtlMinutes);
+  const apiBase = useVaultStore((s) => s.settings.apiBase);
+  const launchVault = useVaultStore((s) => s.launchVault);
+  const enforceCachePolicy = useVaultStore((s) => s.enforceCachePolicy);
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
@@ -54,22 +53,17 @@ export function GalleryView() {
    
   useEffect(() => {
     if (!hydrated) return;
-    void dispatch(enforceCachePolicy());
-  }, [hydrated, dispatch]);
+    void enforceCachePolicy();
+  }, [hydrated, enforceCachePolicy]);
 
   useEffect(() => {
     if (!cacheExpiresAt || !Number.isFinite(cacheExpiresAt)) return;
-  
     const id = window.setInterval(() => {
       setTick((n) => n + 1);
-  
-      if (Date.now() >= cacheExpiresAt) {
-        void dispatch(enforceCachePolicy());
-      }
+      if (Date.now() >= cacheExpiresAt) void enforceCachePolicy();
     }, 15_000);
-  
     return () => window.clearInterval(id);
-  }, [cacheExpiresAt, dispatch]);
+  }, [cacheExpiresAt, enforceCachePolicy]);
 
   const groups = useMemo(() => groupByDay(files), [files]);
   const flatIndex = useMemo(() => {
@@ -88,7 +82,7 @@ export function GalleryView() {
         <button
           type="button"
           className="text-btn"
-          onClick={() => void dispatch(launchVault())}
+          onClick={() => void launchVault()}
           disabled={launching}
         >
           {launching ? "Launching…" : "Launch Vault"}
@@ -103,7 +97,7 @@ export function GalleryView() {
       {error ? (
         <div className="banner error">
           <p>{error}</p>
-          <button type="button" className="text-btn" onClick={() => void dispatch(launchVault())}>
+          <button type="button" className="text-btn" onClick={() => void launchVault()}>
             Launch Vault
           </button>
         </div>
@@ -126,7 +120,7 @@ export function GalleryView() {
             Launch Vault to open the authenticated tunnel, pull media once, and
             keep it on this device until the TTL you set in Settings.
           </p>
-          <button type="button" className="primary-cta" onClick={() => void dispatch(launchVault())}>
+          <button type="button" className="primary-cta" onClick={() => void launchVault()}>
             Launch Vault
           </button>
         </div>

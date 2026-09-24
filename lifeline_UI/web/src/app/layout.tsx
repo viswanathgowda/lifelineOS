@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
-import StoreProvider from "./StoreProvider";
 
 export const metadata: Metadata = {
   title: "lifelineOS",
@@ -37,9 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
       <body>
-        <StoreProvider>
-          <AppShell>{children}</AppShell>
-        </StoreProvider>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -12,32 +12,19 @@ import {
   VOLUME_OPTIONS,
 } from "@/lib/api";
 import { isLoopbackApiBase, suggestedApiBase } from "@/lib/connection";
-import { useAppSelector, useAppDispatch } from "@/lib/store/hooks";
-import { setSettings, setToken } from "@/lib/store/vaultSlice";
-import { launchVault, clearCache, uploadFile } from "@/lib/store/vaultThunks";
+import { useVaultStore } from "@/lib/store";
 import { CACHE_TTL_OPTIONS, type VaultNamespace } from "@/lib/types";
 
-
 export function SettingsView() {
-
-  const dispatch = useAppDispatch();
-  const settings = useAppSelector((state) => state.vault.settings);
-  const vaultError = useAppSelector(
-    (state) => state.vault.error,
-  );
-  const cacheExpiresAt = useAppSelector(
-    (state) => state.vault.cacheExpiresAt,
-  );
-
-  const lastLaunchedAt = useAppSelector(
-    (state) => state.vault.lastLaunchedAt,
-  );
-
-  const isCacheValid =
-  lastLaunchedAt != null &&
-  cacheExpiresAt != null &&
-  Number.isFinite(cacheExpiresAt) &&
-  Date.now() < cacheExpiresAt;
+  const settings = useVaultStore((s) => s.settings);
+  const setSettings = useVaultStore((s) => s.setSettings);
+  const setToken = useVaultStore((s) => s.setToken);
+  const uploadFile = useVaultStore((s) => s.uploadFile);
+  const clearCache = useVaultStore((s) => s.clearCache);
+  const launchVault = useVaultStore((s) => s.launchVault);
+  const cacheExpiresAt = useVaultStore((s) => s.cacheExpiresAt);
+  const lastLaunchedAt = useVaultStore((s) => s.lastLaunchedAt);
+  const isCacheValid = useVaultStore((s) => s.isCacheValid);
 
   const [file, setFile] = useState<File | null>(null);
   const [mfaCode, setMfaCode] = useState("");
@@ -51,8 +38,8 @@ export function SettingsView() {
     setSuggested(next);
     setNeedsLanHint(
       isLoopbackApiBase(settings.apiBase) &&
-      typeof window !== "undefined" &&
-      !["localhost", "127.0.0.1"].includes(window.location.hostname),
+        typeof window !== "undefined" &&
+        !["localhost", "127.0.0.1"].includes(window.location.hostname),
     );
   }, [settings.apiBase]);
 
@@ -62,20 +49,10 @@ export function SettingsView() {
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
-  
     try {
-      const result = await fn();
-      show(result);
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        show(e.message);
-      } else if (typeof e === "string") {
-        show(e);
-      } else {
-        show(
-          JSON.stringify(e, null, 2),
-        );
-      }
+      show(await fn());
+    } catch (e) {
+      show(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -100,7 +77,7 @@ export function SettingsView() {
             <button
               type="button"
               className="text-btn"
-              onClick={() => dispatch(setSettings({ apiBase: suggested }))}
+              onClick={() => setSettings({ apiBase: suggested })}
             >
               Fix
             </button>
@@ -110,7 +87,7 @@ export function SettingsView() {
           Tunnel API base (lifelineOS core)
           <input
             value={settings.apiBase}
-            onChange={(e) => dispatch(setSettings({ apiBase: e.target.value }))}
+            onChange={(e) => setSettings({ apiBase: e.target.value })}
             placeholder={suggested}
           />
         </label>
@@ -123,23 +100,9 @@ export function SettingsView() {
           <input
             type="password"
             value={settings.token}
-            onChange={(e) =>
-              dispatch(
-                setSettings({
-                  token: e.target.value,
-                }),
-              )
-            }
+            onChange={(e) => setSettings({ token: e.target.value })}
           />
         </label>
-        {vaultError && (
-  <div
-    className="banner error"
-    style={{ marginTop: "0.75rem" }}
-  >
-    {vaultError}
-  </div>
-)}
         <div className="btn-row">
           <button
             type="button"
@@ -165,23 +128,21 @@ export function SettingsView() {
           disabled={busy}
           onClick={() =>
             run(async () => {
-              const result = await dispatch(
-                launchVault(),
-              ).unwrap();
-          
+              await launchVault();
+              const s = useVaultStore.getState();
+              if (s.error) throw new Error(s.error);
               return {
                 ok: true,
-                files: result.files,
-                expiresAt: new Date(
-                  result.expiresAt,
-                ).toISOString(),
+                files: s.files.length,
+                expiresAt: s.cacheExpiresAt
+                  ? new Date(s.cacheExpiresAt).toISOString()
+                  : null,
               };
             })
           }
         >
           Launch Vault
         </button>
-     
       </section>
 
       <section className="settings-group">
@@ -196,11 +157,7 @@ export function SettingsView() {
           <select
             value={settings.cacheTtlMinutes}
             onChange={(e) =>
-              dispatch(
-                setSettings({
-                  cacheTtlMinutes: Number(e.target.value),
-                }),
-              )
+              setSettings({ cacheTtlMinutes: Number(e.target.value) })
             }
           >
             {CACHE_TTL_OPTIONS.map((opt) => (
@@ -212,10 +169,11 @@ export function SettingsView() {
         </label>
         <p className="hint">
           {lastLaunchedAt
-            ? `Last launch ${new Date(lastLaunchedAt).toLocaleString()} · ${isCacheValid
-              ? `expires ${cacheExpiresAt ? new Date(cacheExpiresAt).toLocaleString() : "—"}`
-              : "expired — launch again"
-            }`
+            ? `Last launch ${new Date(lastLaunchedAt).toLocaleString()} · ${
+                isCacheValid()
+                  ? `expires ${cacheExpiresAt ? new Date(cacheExpiresAt).toLocaleString() : "—"}`
+                  : "expired — launch again"
+              }`
             : "Not launched yet on this device."}
         </p>
         <p className="hint">
@@ -227,10 +185,7 @@ export function SettingsView() {
           className="secondary"
           disabled={busy}
           onClick={() =>
-            run(async () => {
-              await dispatch(clearCache());
-              return "Local vault cache wiped";
-            })
+            run(() => clearCache().then(() => "Local vault cache wiped"))
           }
         >
           Clear local cache now
@@ -248,11 +203,7 @@ export function SettingsView() {
           <select
             value={settings.namespace}
             onChange={(e) =>
-              dispatch(
-                setSettings({
-                  namespace: e.target.value as VaultNamespace,
-                }),
-              )
+              setSettings({ namespace: e.target.value as VaultNamespace })
             }
           >
             {NAMESPACES.map((ns) => (
@@ -266,13 +217,7 @@ export function SettingsView() {
           Volume
           <select
             value={settings.volumeId}
-            onChange={(e) =>
-              dispatch(
-                setSettings({
-                  volumeId: e.target.value,
-                }),
-              )
-            }
+            onChange={(e) => setSettings({ volumeId: e.target.value })}
           >
             {VOLUME_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -295,13 +240,8 @@ export function SettingsView() {
           onClick={() =>
             run(async () => {
               if (!file) throw new Error("Choose a file first");
-          
-              const result = await dispatch(
-                uploadFile(file),
-              ).unwrap();
-          
+              const result = await uploadFile(file);
               setFile(null);
-          
               return result;
             })
           }
@@ -340,9 +280,7 @@ export function SettingsView() {
           onClick={() =>
             run(async () => {
               const body = await mfaVerify(settings, mfaCode.trim());
-              if (body.sessionToken) {
-                dispatch(setToken(body.sessionToken));
-              }
+              if (body.sessionToken) setToken(body.sessionToken);
               return body;
             })
           }

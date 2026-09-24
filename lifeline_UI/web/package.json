@@ -1,7 +1,9 @@
 {
   "name": "lifeline-ui-web",
   "version": "0.1.0",
+  "version": "0.1.0",
   "private": true,
+  "description": "Tunnel-only Next.js PWA for lifelineOS vault gallery",
   "description": "Tunnel-only Next.js PWA for lifelineOS vault gallery",
   "scripts": {
     "dev": "next dev -p 5173",
@@ -11,13 +13,11 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.12.0",
     "idb": "^8.0.3",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-redux": "^9.3.0",
-    "redux-persist": "^6.0.0"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -25,7 +25,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/redux-persist": "^4.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
