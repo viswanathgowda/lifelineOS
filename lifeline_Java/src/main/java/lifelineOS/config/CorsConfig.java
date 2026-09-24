@@ -18,13 +18,12 @@ public class CorsConfig {
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration config = new CorsConfiguration();
 		// Dev / phone-on-LAN: UI often runs on *:5173 against core *:8080
+		// Dev / phone-on-LAN: UI often runs on *:5173 against core *:8080
 		config.setAllowedOriginPatterns(List.of(
-				"http://172.20.10.5:5173",
 				"http://localhost:*",
 				"http://127.0.0.1:*",
 				"https://localhost:*",
-				"https://127.0.0.1:*"
-				 ,
+				"https://127.0.0.1:*",
 				"http://192.168.*.*:*",
 				"http://10.*.*.*:*",
 				"http://172.*.*.*:*"
