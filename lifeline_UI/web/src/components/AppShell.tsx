@@ -1,48 +1,75 @@
 "use client";
 
 import { useEffect } from "react";
-import { useVaultStore } from "@/lib/store";
+
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { setSettings } from "@/lib/store/vaultSlice";
+import {
+  enforceCachePolicy,
+  restoreLocalMedia,
+} from "@/lib/store/vaultThunks";
+
+import { suggestedApiBase } from "@/lib/connection";
+
 import { InstallBanner } from "./InstallBanner";
 import { TabBar } from "./TabBar";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const syncApiBaseForHost = useVaultStore((s) => s.syncApiBaseForHost);
-  const hydrated = useVaultStore((s) => s.hydrated);
-  const restoreLocalMedia = useVaultStore((s) => s.restoreLocalMedia);
-  const enforceCachePolicy = useVaultStore((s) => s.enforceCachePolicy);
-  const isCacheValid = useVaultStore((s) => s.isCacheValid);
+export function AppShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const dispatch = useAppDispatch();
+
+  const hydrated = useAppSelector(
+    (state) => state.vault.hydrated,
+  );
+
+  const lastLaunchedAt = useAppSelector(
+    (state) => state.vault.lastLaunchedAt,
+  );
+
+  const cacheExpiresAt = useAppSelector(
+    (state) => state.vault.cacheExpiresAt,
+  );
 
   useEffect(() => {
-    const finish = () => {
-      syncApiBaseForHost();
-      void enforceCachePolicy().then(() => {
-        if (useVaultStore.getState().isCacheValid()) {
-          void restoreLocalMedia();
-        }
-      });
-    };
+    dispatch(
+      setSettings({
+        apiBase: suggestedApiBase(),
+      }),
+    );
 
-    if (useVaultStore.persist.hasHydrated()) {
-      finish();
-      return;
-    }
-    return useVaultStore.persist.onFinishHydration(finish);
-  }, [syncApiBaseForHost, enforceCachePolicy, restoreLocalMedia]);
+    void dispatch(enforceCachePolicy());
+  }, [dispatch]);
 
   useEffect(() => {
     if (!hydrated) return;
-    syncApiBaseForHost();
-  }, [hydrated, syncApiBaseForHost]);
 
-  useEffect(() => {
-    if (!hydrated || !isCacheValid()) return;
-    void restoreLocalMedia();
-  }, [hydrated, isCacheValid, restoreLocalMedia]);
+    const cacheValid =
+      lastLaunchedAt != null &&
+      cacheExpiresAt != null &&
+      Number.isFinite(cacheExpiresAt) &&
+      Date.now() < cacheExpiresAt;
+
+    if (!cacheValid) return;
+
+    void dispatch(restoreLocalMedia());
+  }, [
+    dispatch,
+    hydrated,
+    lastLaunchedAt,
+    cacheExpiresAt,
+  ]);
 
   return (
     <div className="app-shell">
       <InstallBanner />
-      <main className="app-main">{children}</main>
+
+      <main className="app-main">
+        {children}
+      </main>
+
       <TabBar />
     </div>
   );
