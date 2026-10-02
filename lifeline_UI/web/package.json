@@ -1,10 +1,8 @@
 {
   "name": "lifeline-ui-web",
-  "version": "0.1.0",
-  "version": "0.1.0",
   "private": true,
-  "description": "Tunnel-only Next.js PWA for lifelineOS vault gallery",
-  "description": "Tunnel-only Next.js PWA for lifelineOS vault gallery",
+  "version": "0.0.1",
+  "description": "Tunnel-only web UI for lifelineOS",
   "scripts": {
     "dev": "next dev -p 5173",
     "build": "next build --webpack",
